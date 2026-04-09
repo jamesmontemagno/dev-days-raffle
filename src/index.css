@@ -1,0 +1,78 @@
+:root {
+  --text: #3e4457;
+  --text-h: #101828;
+  --text-soft: #667085;
+  --bg: #f5f7fb;
+  --panel: rgba(255, 255, 255, 0.9);
+  --panel-strong: #ffffff;
+  --border: rgba(15, 23, 42, 0.08);
+  --border-strong: rgba(15, 23, 42, 0.14);
+  --accent: #7f56d9;
+  --accent-strong: #2563eb;
+  --shadow:
+    0 20px 35px rgba(15, 23, 42, 0.08),
+    0 6px 18px rgba(15, 23, 42, 0.05);
+  --sans: 'Segoe UI', Inter, system-ui, sans-serif;
+  --mono: 'Cascadia Code', Consolas, monospace;
+
+  font: 16px/1.5 var(--sans);
+  letter-spacing: 0.01em;
+  color: var(--text);
+  background:
+    radial-gradient(circle at top, rgba(127, 86, 217, 0.16), transparent 35%),
+    linear-gradient(180deg, #f8faff 0%, #eff3fb 100%);
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+#root {
+  width: min(1200px, 100%);
+  margin: 0 auto;
+  min-height: 100svh;
+}
+
+body {
+  margin: 0;
+  min-width: 320px;
+}
+
+h1,
+h2,
+h3 {
+  font-weight: 800;
+  color: var(--text-h);
+  line-height: 1.05;
+  margin: 0;
+}
+
+h1 {
+  font-size: clamp(2.75rem, 5vw, 4.5rem);
+  margin-bottom: 1rem;
+}
+
+h2 {
+  font-size: clamp(1.5rem, 3vw, 2.1rem);
+}
+
+p {
+  margin: 0;
+}
+
+code {
+  font-family: var(--mono);
+  border-radius: 4px;
+  color: var(--text-h);
+  background: rgba(15, 23, 42, 0.06);
+  padding: 0.15rem 0.4rem;
+}
+
+a {
+  color: inherit;
+}
+
+button,
+input {
+  font: inherit;
+}
