@@ -429,6 +429,13 @@ function App() {
           </ul>
         </aside>
       </section>
+
+      <footer className="site-footer">
+        <a className="repo-link" href={env.repoUrl} target="_blank" rel="noreferrer">
+          View the GitHub repo
+        </a>
+        <p className="site-credit">Built by James Montemagno &amp; GitHub Copilot CLI &amp; VS Code</p>
+      </footer>
     </main>
   )
 }

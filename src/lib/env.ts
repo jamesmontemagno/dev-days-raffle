@@ -4,6 +4,7 @@ export const env = {
   supabaseUrl: value(import.meta.env.VITE_SUPABASE_URL),
   supabaseAnonKey: value(import.meta.env.VITE_SUPABASE_ANON_KEY),
   adminPasswordHash: value(import.meta.env.VITE_ADMIN_PASSWORD_HASH).toLowerCase(),
+  repoUrl: value(import.meta.env.VITE_REPO_URL) || 'https://github.com/jamesmontemagno/dev-days-raffle',
   eventName: value(import.meta.env.VITE_EVENT_NAME) || 'GitHub Copilot Dev Days Giveaway',
   eventTagline:
     value(import.meta.env.VITE_EVENT_TAGLINE) ||

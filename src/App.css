@@ -330,6 +330,30 @@
   color: var(--text-soft);
 }
 
+.site-footer {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: center;
+  padding: 0 6px 6px;
+  color: var(--text-soft);
+}
+
+.repo-link {
+  color: var(--text-h);
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.repo-link:hover {
+  text-decoration: underline;
+}
+
+.site-credit {
+  margin: 0;
+}
+
 @keyframes pulse {
   0%,
   100% {
@@ -361,5 +385,10 @@
 
   .winner-meta {
     text-align: left;
+  }
+
+  .site-footer {
+    flex-direction: column;
+    align-items: flex-start;
   }
 }
