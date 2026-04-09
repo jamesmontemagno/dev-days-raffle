@@ -31,14 +31,14 @@ const initialSummary: DashboardSummary = {
   eligibleCount: 0,
 }
 const rouletteFillers = [
-  'Compiling luck...',
-  'Warming up the spinner...',
-  'Shuffling name badges...',
-  'Consulting the raffle gods...',
-  'Charging the confetti cannons...',
-  'Lining up the finalists...',
-  'Building suspense...',
-  'Polishing the trophy...',
+  'Indexing the attendee pool...',
+  'Syncing with Copilot energy...',
+  'Reviewing Dev Days entries...',
+  'Loading the lucky prompt...',
+  'Spinning up swag mode...',
+  'Scanning the finalist list...',
+  'Resolving the winning branch...',
+  'Preparing the celebration...',
 ]
 const initialForm: EntryFormValues = {
   name: '',
@@ -59,7 +59,7 @@ function App() {
   const [formValues, setFormValues] = useState(initialForm)
   const [submitState, setSubmitState] = useState<SubmitState>({
     type: 'idle',
-    message: 'Enter your name once and you are in the draw.',
+    message: 'Drop your details once to join the GitHub Copilot Dev Days giveaway.',
   })
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [summary, setSummary] = useState(initialSummary)
@@ -68,7 +68,7 @@ function App() {
   const [adminPassword, setAdminPassword] = useState('')
   const [adminGateState, setAdminGateState] = useState<AdminGateState>({
     type: 'idle',
-    message: 'Enter the admin password to unlock the drawing controls.',
+    message: 'Enter the host password to unlock the GitHub Copilot Dev Days draw console.',
   })
   const [adminLoading, setAdminLoading] = useState(false)
   const [prizeLabel, setPrizeLabel] = useState('')
@@ -135,7 +135,7 @@ function App() {
       return currentWinner.displayName
     }
 
-    return isAnimating ? activeName : 'Ready to draw'
+    return isAnimating ? activeName : 'Ready for the next winner'
   }, [activeName, currentWinner, isAnimating])
 
   const updateFormValue = <Key extends keyof EntryFormValues>(field: Key, value: EntryFormValues[Key]) => {
@@ -147,7 +147,7 @@ function App() {
 
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault()
-    setSubmitState({ type: 'idle', message: 'Submitting your entry...' })
+    setSubmitState({ type: 'idle', message: 'Submitting your GitHub Copilot Dev Days entry...' })
     setIsSubmitting(true)
 
     try {
@@ -155,10 +155,10 @@ function App() {
       setFormValues(initialForm)
       setSubmitState({
         type: 'success',
-        message: 'You are in. Good luck in the raffle.',
+        message: 'You are in for the GitHub Copilot Dev Days giveaway.',
       })
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Unable to submit your entry.'
+      const message = error instanceof Error ? error.message : 'Unable to submit your Dev Days entry.'
       setSubmitState({ type: 'error', message })
     } finally {
       setIsSubmitting(false)
@@ -171,7 +171,7 @@ function App() {
     if (!isAdminPasswordConfigured) {
       setAdminGateState({
         type: 'error',
-        message: 'Set VITE_ADMIN_PASSWORD_HASH before using the admin page.',
+        message: 'Set VITE_ADMIN_PASSWORD_HASH before using the Dev Days host console.',
       })
       return
     }
@@ -180,7 +180,7 @@ function App() {
     if (hashedPassword !== env.adminPasswordHash) {
       setAdminGateState({
         type: 'error',
-        message: 'That password did not match the configured admin password.',
+        message: 'That password did not match the configured host password.',
       })
       return
     }
@@ -188,9 +188,9 @@ function App() {
     window.sessionStorage.setItem(ADMIN_STORAGE_KEY, 'true')
     setAdminReady(true)
     setAdminPassword('')
-    setAdminGateState({
-      type: 'idle',
-      message: 'Admin controls unlocked for this browser session.',
+      setAdminGateState({
+        type: 'idle',
+      message: 'Host controls unlocked for this browser session.',
     })
   }
 
@@ -238,36 +238,36 @@ function App() {
   }
 
   const unlockHint = isAdminPasswordConfigured
-    ? 'Use the admin password configured in your deployment secrets.'
+    ? 'Use the host password configured in your deployment secrets.'
     : 'The password hash is not configured yet.'
 
   return (
     <main className="app-shell">
       <section className="hero-panel">
         <div className="hero-copy">
-          <span className="eyebrow">Static event raffle</span>
+          <span className="eyebrow">GitHub Copilot Dev Days</span>
           <h1>{env.eventName}</h1>
           <p className="hero-text">{env.eventTagline}</p>
           <p className="hero-subtext">
-            Share the root URL with attendees. Use <code>{ADMIN_ROUTE}</code> for the password-gated
-            staff controls.
+            Share the main page with attendees, then use <code>{ADMIN_ROUTE}</code> for the
+            password-gated host console during the live giveaway.
           </p>
           <div className="nav-actions">
             <a className="primary-link" href={PUBLIC_ROUTE}>
-              Attendee entry
+              Enter giveaway
             </a>
             <a className="secondary-link" href={ADMIN_ROUTE}>
-              Admin draw
+              Open host console
             </a>
           </div>
         </div>
         <div className="hero-card">
           <img src={heroImg} className="hero-image" width="170" height="179" alt="" />
           <div className="hero-card-copy">
-            <span className="eyebrow">One winner, one time</span>
+            <span className="eyebrow">Built for live draws</span>
             <p>
-              Entrants are persisted in Supabase and the winning draw marks them so they cannot be
-              picked twice.
+              Entries stay in Supabase, the live draw animation resolves to the persisted winner,
+              and no winner can be selected twice.
             </p>
           </div>
         </div>
@@ -276,7 +276,7 @@ function App() {
       {!isSupabaseConfigured && (
         <section className="notice warning">
           <strong>Supabase is not configured yet.</strong> Add the values from <code>.env.example</code> to
-          enable entries and drawing.
+          enable GitHub Copilot Dev Days entries and live draws.
         </section>
       )}
 
@@ -284,8 +284,8 @@ function App() {
         <article className="panel">
           <header className="panel-header">
             <div>
-              <span className="eyebrow">{isAdminRoute ? 'Staff mode' : 'Public form'}</span>
-              <h2>{isAdminRoute ? 'Run the raffle' : 'Enter the raffle'}</h2>
+              <span className="eyebrow">{isAdminRoute ? 'Host console' : 'Attendee entry'}</span>
+              <h2>{isAdminRoute ? 'Run the Dev Days draw' : 'Join the giveaway'}</h2>
             </div>
           </header>
 
@@ -311,7 +311,7 @@ function App() {
                 />
               </label>
               <label>
-                Email
+                Work email
                 <input
                   type="email"
                   value={formValues.email}
@@ -320,7 +320,7 @@ function App() {
                 />
               </label>
               <button className="primary-button" type="submit" disabled={submitDisabled}>
-                {isSubmitting ? 'Submitting...' : 'Join the raffle'}
+                {isSubmitting ? 'Submitting...' : 'Join Dev Days'}
               </button>
               <p className={`form-message ${submitState.type}`}>{submitState.message}</p>
             </form>
@@ -332,12 +332,12 @@ function App() {
                   type="password"
                   value={adminPassword}
                   onChange={(event) => setAdminPassword(event.target.value)}
-                  placeholder="Enter password"
+                  placeholder="Enter host password"
                   required
                 />
               </label>
               <button className="primary-button" type="submit">
-                Unlock admin
+                Unlock console
               </button>
               <p className={`form-message ${adminGateState.type}`}>{adminGateState.message}</p>
               <p className="muted-copy">{unlockHint}</p>
@@ -360,22 +360,22 @@ function App() {
               </div>
 
               <label className="prize-field">
-                Prize label
+                Prize or swag drop
                 <input
                   type="text"
                   value={prizeLabel}
                   onChange={(event) => setPrizeLabel(event.target.value)}
-                  placeholder="Optional, e.g. Mechanical keyboard"
+                  placeholder="Optional, e.g. Copilot swag bundle"
                 />
               </label>
 
               <div className={`roulette-card ${isAnimating ? 'live' : ''}`}>
-                <span className="roulette-label">{isAnimating ? 'Drawing now' : 'Winner board'}</span>
+                <span className="roulette-label">{isAnimating ? 'Live draw in progress' : 'Winner reveal'}</span>
                 <strong>{winnerHeadline}</strong>
                 <p>
                   {currentWinner
-                    ? `${currentWinner.organization ?? 'Winner selected'}`
-                    : 'Press draw to animate the pick and reveal the winner.'}
+                    ? `${currentWinner.organization ?? 'GitHub Copilot Dev Days winner'}`
+                    : 'Start the draw to animate the reveal and lock in the next winner.'}
                 </p>
               </div>
 
@@ -386,7 +386,7 @@ function App() {
                   onClick={() => void handleDrawWinner()}
                   disabled={!isSupabaseConfigured || isAnimating || adminLoading || summary.eligibleCount === 0}
                 >
-                  {isAnimating ? 'Drawing...' : 'Draw a winner'}
+                  {isAnimating ? 'Drawing...' : 'Pick a winner'}
                 </button>
                 <button className="secondary-button" type="button" onClick={() => void loadDashboard()}>
                   {adminLoading ? 'Refreshing...' : 'Refresh dashboard'}
@@ -402,18 +402,18 @@ function App() {
           <header className="panel-header">
             <div>
               <span className="eyebrow">Recent results</span>
-              <h2>Winner history</h2>
+              <h2>Dev Days winners</h2>
             </div>
           </header>
           <ul className="winner-list">
             {winners.length === 0 ? (
-              <li className="winner-empty">No winners yet. The first draw will show up here.</li>
+              <li className="winner-empty">No winners yet. The first GitHub Copilot Dev Days draw will show up here.</li>
             ) : (
               winners.map((winner) => (
                 <li key={winner.id} className="winner-item">
                   <div>
                     <strong>{winner.displayName}</strong>
-                    <p>{winner.organization ?? 'Event attendee'}</p>
+                    <p>{winner.organization ?? 'GitHub Copilot Dev Days attendee'}</p>
                   </div>
                   <div className="winner-meta">
                     {winner.prizeLabel && <span>{winner.prizeLabel}</span>}
