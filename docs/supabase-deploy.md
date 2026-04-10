@@ -19,7 +19,7 @@ The app expects:
 
 - a Supabase project URL
 - a Supabase anon key
-- the SQL in `supabase\migrations\202604091954_raffle.sql` to be applied
+- the SQL migrations in `supabase\migrations\` to be applied
 - an admin password hash in `VITE_ADMIN_PASSWORD_HASH`
 
 ## Phase 1: configure Supabase MCP in VS Code
@@ -54,6 +54,7 @@ Recommended project naming:
 After MCP is connected, have Copilot apply:
 
 - `supabase\migrations\202604091954_raffle.sql`
+- `supabase\migrations\202604102130_admin_entry_management.sql`
 
 That migration creates:
 
@@ -61,11 +62,13 @@ That migration creates:
 - `public.raffle_summary()`
 - `public.list_recent_winners(integer)`
 - `public.draw_winner(text)`
+- `public.list_entries()`
+- `public.remove_entry(uuid)`
 
 Suggested prompt to use in VS Code once the Supabase MCP server is ready:
 
 ```text
-Use the Supabase MCP server for this workspace and apply the SQL in supabase\migrations\202604091954_raffle.sql to my raffle project. Then verify that the raffle_entries table and the raffle_summary, list_recent_winners, and draw_winner functions exist.
+Use the Supabase MCP server for this workspace and apply the SQL migrations in supabase\migrations\ to my raffle project, including 202604091954_raffle.sql and 202604102130_admin_entry_management.sql. Then verify that the raffle_entries table and the raffle_summary, list_recent_winners, draw_winner, list_entries, and remove_entry functions exist.
 ```
 
 ## Phase 4: verify the database behavior
@@ -77,11 +80,13 @@ After the migration is applied, verify:
 3. `raffle_summary()` returns counts
 4. `list_recent_winners()` returns rows when winners exist
 5. `draw_winner()` marks a winner and prevents that row from being drawn again
+6. `list_entries()` returns entrant rows for admin management
+7. `remove_entry(uuid)` removes a selected entrant row
 
 Suggested MCP prompt:
 
 ```text
-Using the Supabase MCP server, verify the raffle schema for this repo. Confirm the raffle_entries table exists, inspect the policies on it, and verify the raffle_summary, list_recent_winners, and draw_winner functions are available.
+Using the Supabase MCP server, verify the raffle schema for this repo. Confirm the raffle_entries table exists, inspect the policies on it, and verify the raffle_summary, list_recent_winners, draw_winner, list_entries, and remove_entry functions are available.
 ```
 
 ## Phase 5: set local environment values
@@ -123,6 +128,7 @@ Then verify:
 2. the admin page at `#/admin` unlocks with your password
 3. the admin dashboard loads counts
 4. drawing a winner updates the recent winner list
+5. the admin entry selector shows entrants and removing a selected entrant updates counts
 
 ## Phase 7: configure GitHub Pages deployment secrets
 
@@ -154,13 +160,13 @@ Once your Supabase MCP server is configured, these are the best follow-up asks t
 ### Apply the migration
 
 ```text
-Use the Supabase MCP server and apply supabase\migrations\202604091954_raffle.sql to my connected project.
+Use the Supabase MCP server and apply supabase\migrations\202604091954_raffle.sql and supabase\migrations\202604102130_admin_entry_management.sql to my connected project.
 ```
 
 ### Inspect the schema
 
 ```text
-Use the Supabase MCP server to inspect the raffle_entries table, its policies, and the raffle_summary, list_recent_winners, and draw_winner functions.
+Use the Supabase MCP server to inspect the raffle_entries table, its policies, and the raffle_summary, list_recent_winners, draw_winner, list_entries, and remove_entry functions.
 ```
 
 ### Smoke test the project

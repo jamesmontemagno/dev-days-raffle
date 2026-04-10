@@ -5,13 +5,25 @@ import { env, isAdminPasswordConfigured, isLocalFileMode, isSupabaseConfigured }
 import {
   drawWinner,
   getDashboardSummary,
+  listEntries,
   listRecentWinners,
+  removeEntry,
   submitEntry,
+  type EntryRecord,
   type DashboardSummary,
   type EntryFormValues,
   type WinnerRecord,
 } from './lib/raffle'
-import { drawLocalWinner, getLocalDashboardSummary, loadLocalEntries, type LocalEntry } from './lib/localRaffle'
+import {
+  addLocalEntry,
+  drawLocalWinner,
+  getLocalEntryIdentityKey,
+  getLocalDashboardSummary,
+  getLocalWinnerFallbackIdentityKey,
+  loadLocalEntries,
+  serializeLocalEntriesToCsv,
+  type LocalEntry,
+} from './lib/localRaffle'
 import { hashString } from './lib/hash'
 
 type SubmitState =
@@ -23,9 +35,23 @@ type AdminGateState =
   | { type: 'idle'; message: string }
   | { type: 'error'; message: string }
 
+type EntryAdminState =
+  | { type: 'idle'; message: string }
+  | { type: 'success'; message: string }
+  | { type: 'error'; message: string }
+
+type AdminEntryOption = {
+  id: string
+  displayName: string
+  organization: string | null
+  email: string | null
+  wonAt: string | null
+}
+
 const PUBLIC_ROUTE = '#/'
 const ADMIN_ROUTE = '#/admin'
 const ADMIN_STORAGE_KEY = 'raffle-admin-unlocked'
+const THEME_STORAGE_KEY = 'raffle-theme'
 const initialSummary: DashboardSummary = {
   totalEntries: 0,
   winnersCount: 0,
@@ -56,6 +82,10 @@ const buildAnimationSequence = (winnerName: string) => {
 
 function App() {
   const animationTimeout = useRef<number | undefined>(undefined)
+  const [theme, setTheme] = useState<'dark' | 'light'>(() => {
+    const savedTheme = window.localStorage.getItem(THEME_STORAGE_KEY)
+    return savedTheme === 'light' ? 'light' : 'dark'
+  })
   const [route, setRoute] = useState(() => normalizeHashRoute())
   const [formValues, setFormValues] = useState(initialForm)
   const [submitState, setSubmitState] = useState<SubmitState>({
@@ -79,12 +109,59 @@ function App() {
   const [isAnimating, setIsAnimating] = useState(false)
   const [localEntries, setLocalEntries] = useState<LocalEntry[]>([])
   const [localFileError, setLocalFileError] = useState('')
+  const [adminEntries, setAdminEntries] = useState<EntryRecord[]>([])
+  const [selectedEntryId, setSelectedEntryId] = useState('')
+  const [entryAdminState, setEntryAdminState] = useState<EntryAdminState>({
+    type: 'idle',
+    message: 'Pick an entry to remove from the raffle list.',
+  })
+  const [isRemovingEntry, setIsRemovingEntry] = useState(false)
 
   const isAdminRoute = route === ADMIN_ROUTE
-  const submitDisabled = !isSupabaseConfigured || isSubmitting
-  const adminLocked = !adminReady
+  const isLocalDevCsvMode = isLocalFileMode && import.meta.env.DEV
+  const submitDisabled = (!isSupabaseConfigured && !isLocalFileMode) || isSubmitting
+  const adminLocked = !isLocalDevCsvMode && !adminReady
 
-  const localUsedNames = useMemo(() => new Set(winners.map((w) => w.displayName)), [winners])
+  const localUsedIdentityKeys = useMemo(
+    () => new Set(winners.map((winner) => winner.identityKey ?? getLocalWinnerFallbackIdentityKey(winner))),
+    [winners],
+  )
+
+  const localAdminEntries = useMemo<AdminEntryOption[]>(() => {
+    return localEntries.map((entry) => {
+      const identityKey = getLocalEntryIdentityKey(entry)
+      const matchedWinner = winners.find(
+        (winner) => (winner.identityKey ?? getLocalWinnerFallbackIdentityKey(winner)) === identityKey,
+      )
+
+      return {
+        id: identityKey,
+        displayName: entry.name,
+        organization: entry.organization,
+        email: entry.email,
+        wonAt: matchedWinner?.wonAt ?? null,
+      }
+    })
+  }, [localEntries, winners])
+
+  const visibleAdminEntries = useMemo<AdminEntryOption[]>(() => {
+    if (isLocalFileMode) {
+      return localAdminEntries
+    }
+
+    return adminEntries.map((entry) => ({
+      id: entry.id,
+      displayName: entry.displayName,
+      organization: entry.organization,
+      email: entry.email,
+      wonAt: entry.wonAt,
+    }))
+  }, [adminEntries, isLocalFileMode, localAdminEntries])
+
+  const selectedAdminEntry = useMemo(
+    () => visibleAdminEntries.find((entry) => entry.id === selectedEntryId) ?? null,
+    [selectedEntryId, visibleAdminEntries],
+  )
 
   useEffect(() => {
     window.location.hash = normalizeHashRoute()
@@ -113,12 +190,48 @@ function App() {
     loadLocalEntries(env.localNamesFile)
       .then((entries) => {
         setLocalEntries(entries)
+        setLocalFileError('')
       })
       .catch((error: unknown) => {
         const message = error instanceof Error ? error.message : 'Unable to load the local names file.'
         setLocalFileError(message)
       })
   }, [])
+
+  const persistLocalEntries = useCallback(
+    async (entries: LocalEntry[]) => {
+      if (!isLocalDevCsvMode) {
+        return
+      }
+
+      const response = await fetch('/__local-raffle/persist', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          csv: serializeLocalEntriesToCsv(entries),
+        }),
+      })
+
+      if (response.ok) {
+        return
+      }
+
+      let message = 'Unable to persist local entries to CSV.'
+      try {
+        const payload = (await response.json()) as { error?: string }
+        if (payload.error) {
+          message = payload.error
+        }
+      } catch {
+        // Keep the fallback message if response parsing fails.
+      }
+
+      throw new Error(message)
+    },
+    [isLocalDevCsvMode],
+  )
 
   const loadDashboard = useCallback(async () => {
     if (isLocalFileMode) {
@@ -134,9 +247,14 @@ function App() {
     setDrawError('')
 
     try {
-      const [nextSummary, nextWinners] = await Promise.all([getDashboardSummary(), listRecentWinners()])
+      const [nextSummary, nextWinners, nextEntries] = await Promise.all([
+        getDashboardSummary(),
+        listRecentWinners(),
+        listEntries(),
+      ])
       setSummary(nextSummary)
       setWinners(nextWinners)
+      setAdminEntries(nextEntries)
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Unable to load the raffle dashboard.'
       setDrawError(message)
@@ -150,10 +268,21 @@ function App() {
       return
     }
 
-    if (!isAdminRoute || adminReady) {
+    if (!isAdminRoute || adminReady || isLocalDevCsvMode) {
       void loadDashboard()
     }
-  }, [adminReady, isAdminRoute, loadDashboard])
+  }, [adminReady, isAdminRoute, isLocalDevCsvMode, loadDashboard])
+
+  useEffect(() => {
+    if (visibleAdminEntries.length === 0) {
+      setSelectedEntryId('')
+      return
+    }
+
+    if (!visibleAdminEntries.some((entry) => entry.id === selectedEntryId)) {
+      setSelectedEntryId(visibleAdminEntries[0]!.id)
+    }
+  }, [selectedEntryId, visibleAdminEntries])
 
   const winnerHeadline = useMemo(() => {
     if (currentWinner) {
@@ -170,18 +299,52 @@ function App() {
     }))
   }
 
+  useEffect(() => {
+    document.documentElement.dataset.theme = theme
+    window.localStorage.setItem(THEME_STORAGE_KEY, theme)
+  }, [theme])
+
+  const toggleTheme = () => {
+    setTheme((current) => (current === 'dark' ? 'light' : 'dark'))
+  }
+
   const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault()
-    setSubmitState({ type: 'idle', message: 'Submitting your GitHub Copilot Dev Days entry...' })
+    setSubmitState({
+      type: 'idle',
+      message: isLocalFileMode
+        ? 'Adding attendee to the local raffle list...'
+        : 'Submitting your GitHub Copilot Dev Days entry...',
+    })
     setIsSubmitting(true)
 
     try {
-      await submitEntry(formValues)
+      if (isLocalFileMode) {
+        const nextEntry = addLocalEntry(localEntries, formValues)
+        const nextEntries = [...localEntries, nextEntry]
+        setLocalEntries(nextEntries)
+
+        if (isLocalDevCsvMode) {
+          await persistLocalEntries(nextEntries)
+          setSubmitState({
+            type: 'success',
+            message: `Added ${nextEntry.name}. Saved to ${env.localNamesFile}.`,
+          })
+        } else {
+          setSubmitState({
+            type: 'success',
+            message: `Added ${nextEntry.name}. Local entries stay in memory outside dev mode.`,
+          })
+        }
+      } else {
+        await submitEntry(formValues)
+        setSubmitState({
+          type: 'success',
+          message: 'You are in for the GitHub Copilot Dev Days giveaway.',
+        })
+      }
+
       setFormValues(initialForm)
-      setSubmitState({
-        type: 'success',
-        message: 'You are in for the GitHub Copilot Dev Days giveaway.',
-      })
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Unable to submit your Dev Days entry.'
       setSubmitState({ type: 'error', message })
@@ -190,8 +353,87 @@ function App() {
     }
   }
 
+  const handleExportLocalEntries = () => {
+    if (!isLocalFileMode || localEntries.length === 0) {
+      return
+    }
+
+    const csv = serializeLocalEntriesToCsv(localEntries)
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' })
+    const objectUrl = window.URL.createObjectURL(blob)
+    const timestamp = new Date().toISOString().replace(/[:.]/g, '-')
+    const anchor = document.createElement('a')
+    anchor.href = objectUrl
+    anchor.download = `dev-days-raffle-entries-${timestamp}.csv`
+    document.body.append(anchor)
+    anchor.click()
+    anchor.remove()
+    window.URL.revokeObjectURL(objectUrl)
+  }
+
+  const describeEntry = (entry: AdminEntryOption) => {
+    const details = [entry.organization, entry.email].filter((value): value is string => Boolean(value)).join(' • ')
+    return details ? `${entry.displayName} (${details})` : entry.displayName
+  }
+
+  const handleRemoveEntry = async () => {
+    if (!selectedAdminEntry) {
+      return
+    }
+
+    setIsRemovingEntry(true)
+    setEntryAdminState({ type: 'idle', message: `Removing ${selectedAdminEntry.displayName}...` })
+
+    try {
+      if (isLocalFileMode) {
+        const nextEntries = localEntries.filter(
+          (entry) => getLocalEntryIdentityKey(entry) !== selectedAdminEntry.id,
+        )
+
+        setLocalEntries(nextEntries)
+        setWinners((current) =>
+          current.filter(
+            (winner) => (winner.identityKey ?? getLocalWinnerFallbackIdentityKey(winner)) !== selectedAdminEntry.id,
+          ),
+        )
+
+        if (isLocalDevCsvMode) {
+          await persistLocalEntries(nextEntries)
+        }
+
+        setEntryAdminState({
+          type: 'success',
+          message: `Removed ${selectedAdminEntry.displayName} from local entries.`,
+        })
+      } else {
+        await removeEntry(selectedAdminEntry.id)
+        await loadDashboard()
+        setEntryAdminState({
+          type: 'success',
+          message: `Removed ${selectedAdminEntry.displayName} from Supabase entries.`,
+        })
+      }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unable to remove the selected entry.'
+      setEntryAdminState({ type: 'error', message })
+    } finally {
+      setIsRemovingEntry(false)
+    }
+  }
+
   const handleUnlock = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault()
+
+    if (isLocalDevCsvMode) {
+      window.sessionStorage.setItem(ADMIN_STORAGE_KEY, 'true')
+      setAdminReady(true)
+      setAdminPassword('')
+      setAdminGateState({
+        type: 'idle',
+        message: 'Host controls unlocked for local development.',
+      })
+      return
+    }
 
     if (!isAdminPasswordConfigured) {
       setAdminGateState({
@@ -213,8 +455,8 @@ function App() {
     window.sessionStorage.setItem(ADMIN_STORAGE_KEY, 'true')
     setAdminReady(true)
     setAdminPassword('')
-      setAdminGateState({
-        type: 'idle',
+    setAdminGateState({
+      type: 'idle',
       message: 'Host controls unlocked for this browser session.',
     })
   }
@@ -252,7 +494,7 @@ function App() {
 
     try {
       if (isLocalFileMode) {
-        const winner = drawLocalWinner(localEntries, localUsedNames, prizeLabel)
+        const winner = drawLocalWinner(localEntries, localUsedIdentityKeys, prizeLabel)
         await playAnimation(winner.displayName)
         setWinners((current) => [winner, ...current])
         setCurrentWinner(winner)
@@ -269,7 +511,9 @@ function App() {
     }
   }
 
-  const unlockHint = isAdminPasswordConfigured
+  const unlockHint = isLocalDevCsvMode
+    ? 'Local CSV mode on localhost: admin password is bypassed for convenience.'
+    : isAdminPasswordConfigured
     ? 'Use the host password configured in your deployment secrets.'
     : 'The password hash is not configured yet.'
 
@@ -282,7 +526,9 @@ function App() {
           <p className="hero-text">{env.eventTagline}</p>
           <p className="hero-subtext">
             {isAdminRoute
-              ? `Use ${ADMIN_ROUTE} for the password-gated host console during the live giveaway.`
+              ? isLocalDevCsvMode
+                ? `Use ${ADMIN_ROUTE} for host controls in local CSV mode (no password needed on localhost).`
+                : `Use ${ADMIN_ROUTE} for the password-gated host console during the live giveaway.`
               : 'Sign up below for a chance to win GitHub Copilot Dev Days prizes and swag.'}
           </p>
           <div className="nav-actions">
@@ -295,6 +541,9 @@ function App() {
                 Enter giveaway
               </a>
             )}
+            <button className="secondary-button theme-toggle" type="button" onClick={toggleTheme}>
+              {theme === 'dark' ? 'Switch to light theme' : 'Switch to dark theme'}
+            </button>
           </div>
         </div>
         <div className="hero-card">
@@ -310,17 +559,26 @@ function App() {
         </div>
       </section>
 
-      {!isSupabaseConfigured && !isLocalFileMode && (
-        <section className="notice warning">
-          <strong>Supabase is not configured yet.</strong> Add the values from <code>.env.example</code> to
-          enable GitHub Copilot Dev Days entries and live draws.
-        </section>
-      )}
-
       {isLocalFileMode && (
         <section className="notice">
           <strong>Running in local file mode.</strong> Names are loaded from{' '}
-          <code>{env.localNamesFile}</code>. Winners are tracked in memory for this session.
+          <code>{env.localNamesFile}</code>. Additional entries can be added below.
+          <p className="muted-copy">
+            {isLocalDevCsvMode
+              ? 'Local submissions are auto-saved to disk in dev mode and included in exports.'
+              : 'Outside local dev, local submissions are session-only and can still be exported manually.'}
+          </p>
+          <div className="notice-actions">
+            <button
+              className="secondary-button"
+              type="button"
+              onClick={handleExportLocalEntries}
+              disabled={localEntries.length === 0}
+            >
+              Export attendee CSV
+            </button>
+            <span className="muted-copy">{localEntries.length} attendees loaded</span>
+          </div>
           {localFileError && <span className="error"> {localFileError}</span>}
         </section>
       )}
@@ -335,19 +593,12 @@ function App() {
           </header>
 
           {!isAdminRoute ? (
-            isLocalFileMode ? (
-              <div className="entry-form">
-                <p className="form-message idle">
-                  This raffle is running in local file mode. Names are pre-loaded from{' '}
-                  <code>{env.localNamesFile}</code>. Head to the{' '}
-                  <a href={ADMIN_ROUTE}>host console</a> to start the draw.
-                </p>
-                {localEntries.length > 0 && (
-                  <p className="muted-copy">{localEntries.length} names loaded.</p>
-                )}
-              </div>
-            ) : (
             <form className="entry-form" onSubmit={handleSubmit}>
+              {isLocalFileMode && (
+                <p className="form-message idle">
+                  Local CSV mode is active. New attendees are added in memory and synced to disk during local dev.
+                </p>
+              )}
               <label>
                 Full name
                 <input
@@ -377,11 +628,10 @@ function App() {
                 />
               </label>
               <button className="primary-button" type="submit" disabled={submitDisabled}>
-                {isSubmitting ? 'Submitting...' : 'Join Dev Days'}
+                {isSubmitting ? 'Submitting...' : isLocalFileMode ? 'Add attendee locally' : 'Join Dev Days'}
               </button>
               <p className={`form-message ${submitState.type}`}>{submitState.message}</p>
             </form>
-            )
           ) : adminLocked ? (
             <form className="entry-form" onSubmit={handleUnlock}>
               <label>
@@ -391,7 +641,7 @@ function App() {
                   value={adminPassword}
                   onChange={(event) => setAdminPassword(event.target.value)}
                   placeholder="Enter host password"
-                  required
+                  required={!isLocalDevCsvMode}
                 />
               </label>
               <button className="primary-button" type="submit">
@@ -449,6 +699,39 @@ function App() {
                 <button className="secondary-button" type="button" onClick={() => void loadDashboard()}>
                   {adminLoading ? 'Refreshing...' : 'Refresh dashboard'}
                 </button>
+              </div>
+
+              <div className="entry-manager">
+                <label className="prize-field" htmlFor="entry-selector">
+                  Manage entries
+                  <select
+                    id="entry-selector"
+                    className="entry-select"
+                    value={selectedEntryId}
+                    onChange={(event) => setSelectedEntryId(event.target.value)}
+                    disabled={visibleAdminEntries.length === 0 || isRemovingEntry}
+                  >
+                    {visibleAdminEntries.length === 0 ? (
+                      <option value="">No entries available</option>
+                    ) : (
+                      visibleAdminEntries.map((entry) => (
+                        <option key={entry.id} value={entry.id}>
+                          {describeEntry(entry)}
+                          {entry.wonAt ? ' (winner)' : ''}
+                        </option>
+                      ))
+                    )}
+                  </select>
+                </label>
+                <button
+                  className="secondary-button"
+                  type="button"
+                  onClick={() => void handleRemoveEntry()}
+                  disabled={visibleAdminEntries.length === 0 || !selectedAdminEntry || isRemovingEntry}
+                >
+                  {isRemovingEntry ? 'Removing...' : 'Remove selected entry'}
+                </button>
+                <p className={`form-message ${entryAdminState.type}`}>{entryAdminState.message}</p>
               </div>
 
               {drawError && <p className="form-message error">{drawError}</p>}

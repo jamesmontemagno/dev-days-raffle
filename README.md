@@ -12,6 +12,8 @@ A static raffle site for event sign-ups and winner selection. Supports two modes
 - Draw animation that reveals the persisted winner
 - Winner history and dashboard counts
 - One-win-per-person enforcement
+- Admin entry management (review entrants and remove selected entries)
+- Manual dark/light theme toggle with saved preference
 
 <img width="1763" height="1784" alt="image" src="https://github.com/user-attachments/assets/b1176503-b4a1-47b7-a60d-67f3ba76b46a" />
 
@@ -63,7 +65,15 @@ If you already have a list of attendee names and don't want to deploy Supabase, 
 
 3. Leave `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` empty.
 
-4. Run `npm run dev`. The app loads names from the file, shows them on the entry page, and lets you draw winners from the admin console. Winners are tracked in memory for the session.
+4. Run `npm run dev`. The app loads names from the file, allows manual attendee entry from the entry page, auto-saves each local submission back to the configured CSV, and lets you draw winners from the admin console.
+
+5. Use the local-mode **Export attendee CSV** button to download the current merged list at any time.
+
+Notes:
+- Auto-save back to CSV is available only in local dev (`npm run dev`).
+- In built/deployed static environments, CSV files are read-only assets. Local additions remain in memory for the current session unless you export.
+
+When running in local file mode on localhost (`npm run dev`), the admin page does not require a password. In deployed environments, keep `VITE_ADMIN_PASSWORD_HASH` set.
 
 ## Environment variables
 
@@ -71,7 +81,7 @@ If you already have a list of attendee names and don't want to deploy Supabase, 
 | --- | --- | --- |
 | `VITE_SUPABASE_URL` | Supabase mode only | Supabase project URL |
 | `VITE_SUPABASE_ANON_KEY` | Supabase mode only | Public anon key used by the static app |
-| `VITE_ADMIN_PASSWORD_HASH` | Yes | SHA-256 hash of the admin password |
+| `VITE_ADMIN_PASSWORD_HASH` | Required for deployed admin mode | SHA-256 hash of the admin password |
 | `VITE_LOCAL_NAMES_FILE` | Local file mode only | Path to names file served by Vite (e.g. `/names.csv`) |
 | `VITE_EVENT_NAME` | No | Override the page title |
 | `VITE_EVENT_TAGLINE` | No | Override the hero tagline |
@@ -85,12 +95,14 @@ npm run hash:admin -- "your-password-here"
 
 ## Supabase setup
 
-Apply the schema in `supabase\migrations\202604091954_raffle.sql` to your Supabase project. It creates:
+Apply the schema migrations in `supabase\migrations\` to your Supabase project. They create:
 
 - `raffle_entries`
 - `raffle_summary()`
 - `list_recent_winners(limit_count integer)`
 - `draw_winner(selected_prize_label text)`
+- `list_entries()`
+- `remove_entry(selected_entry_id uuid)`
 
 The app only inserts entrant rows directly. Admin stats and draws go through the SQL functions.
 

@@ -12,10 +12,20 @@ export type DashboardSummary = {
   eligibleCount: number
 }
 
+export type EntryRecord = {
+  id: string
+  displayName: string
+  organization: string | null
+  email: string | null
+  wonAt: string | null
+  createdAt: string
+}
+
 export type WinnerRecord = {
   id: string
   displayName: string
   organization: string | null
+  identityKey?: string
   prizeLabel: string | null
   wonAt: string
 }
@@ -34,6 +44,15 @@ type WinnerResponse = {
   won_at: string
 }
 
+type EntryResponse = {
+  id: string
+  display_name: string
+  organization: string | null
+  email: string | null
+  won_at: string | null
+  created_at: string
+}
+
 const normalizeValue = (input: string) => input.trim().replace(/\s+/g, ' ').toLowerCase()
 
 const requireSupabase = () => {
@@ -50,6 +69,15 @@ const mapWinner = (winner: WinnerResponse): WinnerRecord => ({
   organization: winner.organization,
   prizeLabel: winner.prize_label,
   wonAt: winner.won_at,
+})
+
+const mapEntry = (entry: EntryResponse): EntryRecord => ({
+  id: entry.id,
+  displayName: entry.display_name,
+  organization: entry.organization,
+  email: entry.email,
+  wonAt: entry.won_at,
+  createdAt: entry.created_at,
 })
 
 export const submitEntry = async ({ name, organization, email }: EntryFormValues) => {
@@ -119,4 +147,32 @@ export const drawWinner = async (prizeLabel: string): Promise<WinnerRecord> => {
   }
 
   return mapWinner(data)
+}
+
+export const listEntries = async (): Promise<EntryRecord[]> => {
+  const client = requireSupabase()
+  const { data, error } = await client.rpc('list_entries')
+
+  if (error || !data) {
+    throw new Error('Unable to load entries list.')
+  }
+
+  return (data as EntryResponse[]).map(mapEntry)
+}
+
+export const removeEntry = async (entryId: string): Promise<void> => {
+  const client = requireSupabase()
+  const { data, error } = await client
+    .rpc('remove_entry', {
+      selected_entry_id: entryId,
+    })
+    .single<boolean>()
+
+  if (error) {
+    throw new Error('Unable to remove the selected entry.')
+  }
+
+  if (!data) {
+    throw new Error('That entry no longer exists.')
+  }
 }

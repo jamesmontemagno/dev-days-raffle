@@ -2,30 +2,85 @@
   --text: #d4dceb;
   --text-h: #f8fbff;
   --text-soft: #91a0b8;
-  --bg: #0b1220;
   --panel: rgba(12, 20, 35, 0.86);
   --panel-strong: rgba(19, 29, 47, 0.92);
   --border: rgba(148, 163, 184, 0.14);
   --border-strong: rgba(148, 163, 184, 0.22);
   --accent: #7ee787;
   --accent-strong: #58a6ff;
+  --primary-ink: #04111f;
+  --primary-shadow: 0 18px 30px rgba(88, 166, 255, 0.18);
+  --hero-glow: rgba(126, 231, 135, 0.24);
+  --hero-image-shadow: rgba(88, 166, 255, 0.3);
+  --focus-ring: rgba(88, 166, 255, 0.42);
+  --warning-border: rgba(88, 166, 255, 0.24);
+  --warning-bg: rgba(88, 166, 255, 0.1);
+  --success-bg: rgba(126, 231, 135, 0.14);
+  --success-text: #7ee787;
+  --error-bg: rgba(239, 68, 68, 0.14);
+  --error-text: #fca5a5;
+  --roulette-spotlight: rgba(255, 255, 255, 0.18);
+  --roulette-start: rgba(126, 231, 135, 0.18);
+  --roulette-end: rgba(88, 166, 255, 0.96);
+  --roulette-outline: rgba(255, 255, 255, 0.18);
+  --code-bg: rgba(148, 163, 184, 0.12);
+  --surface-error: #fca5a5;
+  --bg-layer-1: rgba(88, 166, 255, 0.18);
+  --bg-layer-2: rgba(126, 231, 135, 0.12);
+  --bg-gradient-start: #07101d;
+  --bg-gradient-mid: #0b1220;
+  --bg-gradient-end: #0f172a;
   --shadow:
     0 24px 50px rgba(2, 6, 23, 0.45),
     0 10px 24px rgba(2, 6, 23, 0.28);
   --sans: 'Segoe UI', Inter, system-ui, sans-serif;
   --mono: 'Cascadia Code', Consolas, monospace;
+  color-scheme: dark;
 
   font: 16px/1.5 var(--sans);
   letter-spacing: 0.01em;
-  color: var(--text);
-  background:
-    radial-gradient(circle at top, rgba(88, 166, 255, 0.18), transparent 30%),
-    radial-gradient(circle at right, rgba(126, 231, 135, 0.12), transparent 28%),
-    linear-gradient(180deg, #07101d 0%, #0b1220 55%, #0f172a 100%);
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+}
+
+:root[data-theme='light'] {
+  --text: #344054;
+  --text-h: #0f172a;
+  --text-soft: #667085;
+  --panel: rgba(255, 255, 255, 0.9);
+  --panel-strong: rgba(255, 255, 255, 0.97);
+  --border: rgba(148, 163, 184, 0.3);
+  --border-strong: rgba(148, 163, 184, 0.44);
+  --accent: #2f9e77;
+  --accent-strong: #2d7ff9;
+  --primary-ink: #ffffff;
+  --primary-shadow: 0 12px 24px rgba(45, 127, 249, 0.22);
+  --hero-glow: rgba(45, 127, 249, 0.18);
+  --hero-image-shadow: rgba(45, 127, 249, 0.22);
+  --focus-ring: rgba(45, 127, 249, 0.42);
+  --warning-border: rgba(45, 127, 249, 0.24);
+  --warning-bg: rgba(45, 127, 249, 0.1);
+  --success-bg: rgba(22, 163, 74, 0.14);
+  --success-text: #166534;
+  --error-bg: rgba(220, 38, 38, 0.14);
+  --error-text: #b91c1c;
+  --roulette-spotlight: rgba(255, 255, 255, 0.32);
+  --roulette-start: rgba(45, 127, 249, 0.8);
+  --roulette-end: rgba(47, 158, 119, 0.88);
+  --roulette-outline: rgba(255, 255, 255, 0.32);
+  --code-bg: rgba(100, 116, 139, 0.14);
+  --surface-error: #b91c1c;
+  --bg-layer-1: rgba(45, 127, 249, 0.16);
+  --bg-layer-2: rgba(47, 158, 119, 0.12);
+  --bg-gradient-start: #eef5ff;
+  --bg-gradient-mid: #f7fafc;
+  --bg-gradient-end: #edf6f3;
+  --shadow:
+    0 20px 36px rgba(15, 23, 42, 0.12),
+    0 8px 16px rgba(15, 23, 42, 0.08);
+  color-scheme: light;
 }
 
 #root {
@@ -37,6 +92,11 @@
 body {
   margin: 0;
   min-width: 320px;
+  color: var(--text);
+  background:
+    radial-gradient(circle at top, var(--bg-layer-1), transparent 30%),
+    radial-gradient(circle at right, var(--bg-layer-2), transparent 28%),
+    linear-gradient(180deg, var(--bg-gradient-start) 0%, var(--bg-gradient-mid) 55%, var(--bg-gradient-end) 100%);
 }
 
 h1,
@@ -65,7 +125,7 @@ code {
   font-family: var(--mono);
   border-radius: 4px;
   color: var(--text-h);
-  background: rgba(148, 163, 184, 0.12);
+  background: var(--code-bg);
   padding: 0.15rem 0.4rem;
 }
 
