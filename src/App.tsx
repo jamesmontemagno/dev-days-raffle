@@ -80,6 +80,22 @@ const buildAnimationSequence = (winnerName: string) => {
   return [...sequence, winnerName, winnerName]
 }
 
+const formatPublicWinnerName = (displayName: string) => {
+  const parts = displayName
+    .trim()
+    .split(/\s+/)
+    .filter((part) => part.length > 0)
+
+  if (parts.length <= 1) {
+    return parts[0] ?? displayName
+  }
+
+  const firstName = parts[0]!
+  const lastInitial = parts[parts.length - 1]![0]?.toUpperCase()
+
+  return lastInitial ? `${firstName} ${lastInitial}.` : firstName
+}
+
 function App() {
   const animationTimeout = useRef<number | undefined>(undefined)
   const [theme, setTheme] = useState<'dark' | 'light'>(() => {
@@ -756,7 +772,7 @@ function App() {
               winners.map((winner) => (
                 <li key={winner.id} className="winner-item">
                   <div>
-                    <strong>{winner.displayName}</strong>
+                    <strong>{isAdminRoute ? winner.displayName : formatPublicWinnerName(winner.displayName)}</strong>
                     <p>{winner.organization ?? 'GitHub Copilot Dev Days attendee'}</p>
                   </div>
                   <div className="winner-meta">
