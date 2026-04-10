@@ -1,19 +1,22 @@
 # Dev Days Raffle
 
-A static raffle site for event sign-ups and winner selection, designed to deploy to GitHub Pages and persist raffle state in Supabase.
+A static raffle site for event sign-ups and winner selection. Supports two modes:
+
+- **Supabase mode** — deploy to GitHub Pages and persist raffle state in Supabase.
+- **Local file mode** — run locally with a CSV or plain-text names file. No backend required.
 
 ## What it does
 
-- Public attendee entry form at the root URL
+- Public attendee entry form at the root URL (Supabase mode)
 - Password-gated admin page at `#/admin`
 - Draw animation that reveals the persisted winner
 - Winner history and dashboard counts
-- One-win-per-person enforcement via Supabase
+- One-win-per-person enforcement
 
 ## Stack
 
 - Vite + React + TypeScript
-- Supabase for storage and draw RPCs
+- Supabase for storage and draw RPCs (optional)
 - GitHub Actions workflow for GitHub Pages deployment
 
 ## Local setup
@@ -30,7 +33,7 @@ A static raffle site for event sign-ups and winner selection, designed to deploy
    Copy-Item .env.example .env.local
    ```
 
-3. Fill in the Supabase values and admin password hash in `.env.local`.
+3. Fill in `.env.local` — see [Environment variables](#environment-variables) below.
 
 4. Start the app:
 
@@ -38,13 +41,36 @@ A static raffle site for event sign-ups and winner selection, designed to deploy
    npm run dev
    ```
 
+## Local file mode (no backend)
+
+If you already have a list of attendee names and don't want to deploy Supabase, point the app at a CSV or plain-text file instead.
+
+1. Add (or edit) `public/names.csv` with your attendees — a sample is already included:
+
+   ```csv
+   name,organization
+   Ada Lovelace,Analytical Engine Co.
+   Alan Turing,Bletchley Park
+   ```
+
+   Supported formats:
+   - **CSV**: `name,organization` (header row optional; organization column optional)
+   - **Plain text**: one name per line
+
+2. Set `VITE_LOCAL_NAMES_FILE=/names.csv` in `.env.local`.
+
+3. Leave `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` empty.
+
+4. Run `npm run dev`. The app loads names from the file, shows them on the entry page, and lets you draw winners from the admin console. Winners are tracked in memory for the session.
+
 ## Environment variables
 
 | Variable | Required | Purpose |
 | --- | --- | --- |
-| `VITE_SUPABASE_URL` | Yes | Supabase project URL |
-| `VITE_SUPABASE_ANON_KEY` | Yes | Public anon key used by the static app |
+| `VITE_SUPABASE_URL` | Supabase mode only | Supabase project URL |
+| `VITE_SUPABASE_ANON_KEY` | Supabase mode only | Public anon key used by the static app |
 | `VITE_ADMIN_PASSWORD_HASH` | Yes | SHA-256 hash of the admin password |
+| `VITE_LOCAL_NAMES_FILE` | Local file mode only | Path to names file served by Vite (e.g. `/names.csv`) |
 | `VITE_EVENT_NAME` | No | Override the page title |
 | `VITE_EVENT_TAGLINE` | No | Override the hero tagline |
 | `VITE_BASE_PATH` | No | Override the Pages base path if needed |

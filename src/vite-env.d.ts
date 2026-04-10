@@ -8,6 +8,7 @@ interface ImportMetaEnv {
   readonly VITE_EVENT_NAME?: string
   readonly VITE_EVENT_TAGLINE?: string
   readonly VITE_BASE_PATH?: string
+  readonly VITE_LOCAL_NAMES_FILE?: string
 }
 
 interface ImportMeta {

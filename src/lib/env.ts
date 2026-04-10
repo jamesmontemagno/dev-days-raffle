@@ -9,7 +9,9 @@ export const env = {
   eventTagline:
     value(import.meta.env.VITE_EVENT_TAGLINE) ||
     'Check in, join the draw, and let Copilot Dev Days decide who takes home the next prize.',
+  localNamesFile: value(import.meta.env.VITE_LOCAL_NAMES_FILE),
 }
 
 export const isSupabaseConfigured = Boolean(env.supabaseUrl && env.supabaseAnonKey)
 export const isAdminPasswordConfigured = Boolean(env.adminPasswordHash)
+export const isLocalFileMode = Boolean(!isSupabaseConfigured && env.localNamesFile)

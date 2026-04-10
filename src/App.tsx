@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import heroImg from './assets/hero.png'
 import './App.css'
-import { env, isAdminPasswordConfigured, isSupabaseConfigured } from './lib/env'
+import { env, isAdminPasswordConfigured, isLocalFileMode, isSupabaseConfigured } from './lib/env'
 import {
   drawWinner,
   getDashboardSummary,
@@ -11,6 +11,7 @@ import {
   type EntryFormValues,
   type WinnerRecord,
 } from './lib/raffle'
+import { drawLocalWinner, getLocalDashboardSummary, loadLocalEntries, type LocalEntry } from './lib/localRaffle'
 import { hashString } from './lib/hash'
 
 type SubmitState =
@@ -76,10 +77,14 @@ function App() {
   const [currentWinner, setCurrentWinner] = useState<WinnerRecord | null>(null)
   const [activeName, setActiveName] = useState(rouletteFillers[0])
   const [isAnimating, setIsAnimating] = useState(false)
+  const [localEntries, setLocalEntries] = useState<LocalEntry[]>([])
+  const [localFileError, setLocalFileError] = useState('')
 
   const isAdminRoute = route === ADMIN_ROUTE
   const submitDisabled = !isSupabaseConfigured || isSubmitting
   const adminLocked = !adminReady
+
+  const localUsedNames = useMemo(() => new Set(winners.map((w) => w.displayName)), [winners])
 
   useEffect(() => {
     window.location.hash = normalizeHashRoute()
@@ -100,7 +105,27 @@ function App() {
     setAdminReady(window.sessionStorage.getItem(ADMIN_STORAGE_KEY) === 'true')
   }, [])
 
+  useEffect(() => {
+    if (!isLocalFileMode || !env.localNamesFile) {
+      return
+    }
+
+    loadLocalEntries(env.localNamesFile)
+      .then((entries) => {
+        setLocalEntries(entries)
+      })
+      .catch((error: unknown) => {
+        const message = error instanceof Error ? error.message : 'Unable to load the local names file.'
+        setLocalFileError(message)
+      })
+  }, [])
+
   const loadDashboard = useCallback(async () => {
+    if (isLocalFileMode) {
+      setSummary(getLocalDashboardSummary(localEntries, winners))
+      return
+    }
+
     if (!isSupabaseConfigured) {
       return
     }
@@ -118,10 +143,10 @@ function App() {
     } finally {
       setAdminLoading(false)
     }
-  }, [])
+  }, [localEntries, winners])
 
   useEffect(() => {
-    if (!isSupabaseConfigured) {
+    if (!isSupabaseConfigured && !isLocalFileMode) {
       return
     }
 
@@ -226,10 +251,17 @@ function App() {
     setCurrentWinner(null)
 
     try {
-      const winner = await drawWinner(prizeLabel)
-      await playAnimation(winner.displayName)
-      setCurrentWinner(winner)
-      await loadDashboard()
+      if (isLocalFileMode) {
+        const winner = drawLocalWinner(localEntries, localUsedNames, prizeLabel)
+        await playAnimation(winner.displayName)
+        setWinners((current) => [winner, ...current])
+        setCurrentWinner(winner)
+      } else {
+        const winner = await drawWinner(prizeLabel)
+        await playAnimation(winner.displayName)
+        setCurrentWinner(winner)
+        await loadDashboard()
+      }
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Unable to complete the draw.'
       setDrawError(message)
@@ -268,19 +300,28 @@ function App() {
         <div className="hero-card">
           <img src={heroImg} className="hero-image" width="170" height="179" alt="" />
           <div className="hero-card-copy">
-            <span className="eyebrow">Built for live draws</span>
+            <span className="eyebrow">{isLocalFileMode ? 'Offline mode' : 'Built for live draws'}</span>
             <p>
-              Entries stay in Supabase, the live draw animation resolves to the persisted winner,
-              and no winner can be selected twice.
+              {isLocalFileMode
+                ? 'Names are loaded from a local CSV or text file. No backend required — winners are tracked for the session.'
+                : 'Entries stay in Supabase, the live draw animation resolves to the persisted winner, and no winner can be selected twice.'}
             </p>
           </div>
         </div>
       </section>
 
-      {!isSupabaseConfigured && (
+      {!isSupabaseConfigured && !isLocalFileMode && (
         <section className="notice warning">
           <strong>Supabase is not configured yet.</strong> Add the values from <code>.env.example</code> to
           enable GitHub Copilot Dev Days entries and live draws.
+        </section>
+      )}
+
+      {isLocalFileMode && (
+        <section className="notice">
+          <strong>Running in local file mode.</strong> Names are loaded from{' '}
+          <code>{env.localNamesFile}</code>. Winners are tracked in memory for this session.
+          {localFileError && <span className="error"> {localFileError}</span>}
         </section>
       )}
 
@@ -294,6 +335,18 @@ function App() {
           </header>
 
           {!isAdminRoute ? (
+            isLocalFileMode ? (
+              <div className="entry-form">
+                <p className="form-message idle">
+                  This raffle is running in local file mode. Names are pre-loaded from{' '}
+                  <code>{env.localNamesFile}</code>. Head to the{' '}
+                  <a href={ADMIN_ROUTE}>host console</a> to start the draw.
+                </p>
+                {localEntries.length > 0 && (
+                  <p className="muted-copy">{localEntries.length} names loaded.</p>
+                )}
+              </div>
+            ) : (
             <form className="entry-form" onSubmit={handleSubmit}>
               <label>
                 Full name
@@ -328,6 +381,7 @@ function App() {
               </button>
               <p className={`form-message ${submitState.type}`}>{submitState.message}</p>
             </form>
+            )
           ) : adminLocked ? (
             <form className="entry-form" onSubmit={handleUnlock}>
               <label>
@@ -388,7 +442,7 @@ function App() {
                   className="primary-button"
                   type="button"
                   onClick={() => void handleDrawWinner()}
-                  disabled={!isSupabaseConfigured || isAnimating || adminLoading || summary.eligibleCount === 0}
+                  disabled={(!isSupabaseConfigured && !isLocalFileMode) || isAnimating || adminLoading || summary.eligibleCount === 0}
                 >
                   {isAnimating ? 'Drawing...' : 'Pick a winner'}
                 </button>
