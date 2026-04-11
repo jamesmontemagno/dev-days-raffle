@@ -56,6 +56,7 @@ type ConfettiPiece = {
   sizePx: number
   rotationDeg: number
   color: string
+  borderRadiusPx: number
 }
 
 const PUBLIC_ROUTE = '#/'
@@ -63,6 +64,7 @@ const ADMIN_ROUTE = '#/admin'
 const RULES_ROUTE = '#/rules'
 const ADMIN_STORAGE_KEY = 'raffle-admin-unlocked'
 const THEME_STORAGE_KEY = 'raffle-theme'
+const SOUND_STORAGE_KEY = 'raffle-sound-enabled'
 const initialSummary: DashboardSummary = {
   totalEntries: 0,
   winnersCount: 0,
@@ -102,19 +104,20 @@ const buildAnimationSequence = (winnerName: string) => {
 }
 
 const CONFETTI_PIECE_HEIGHT_RATIO = 0.6
-const CONFETTI_PIECE_COUNT = 72
+const CONFETTI_PIECE_COUNT = 220
 
 const buildConfettiPieces = (seed: number): ConfettiPiece[] => {
-  const colors = ['#7ee787', '#58a6ff', '#fbbf24', '#f472b6', '#34d399']
+  const colors = ['#7ee787', '#58a6ff', '#fbbf24', '#f472b6', '#34d399', '#f97316', '#f5f5f5']
 
   return Array.from({ length: CONFETTI_PIECE_COUNT }, (_, index) => ({
     id: seed * 1000 + index,
-    left: Math.random() * 100,
-    delayMs: Math.random() * 320,
-    duration: 1200 + Math.random() * 1100,
-    sizePx: 7 + Math.random() * 8,
+    left: -12 + Math.random() * 124,
+    delayMs: Math.random() * 460,
+    duration: 1500 + Math.random() * 1400,
+    sizePx: 6 + Math.random() * 10,
     rotationDeg: Math.random() * 360,
     color: colors[index % colors.length]!,
+    borderRadiusPx: Math.random() > 0.68 ? 999 : 2 + Math.random() * 6,
   }))
 }
 
@@ -163,6 +166,10 @@ function App() {
   const [activeName, setActiveName] = useState(rouletteFillers[0])
   const [isAnimating, setIsAnimating] = useState(false)
   const [confettiBurstCount, setConfettiBurstCount] = useState(0)
+  const [isCelebrationSoundEnabled, setIsCelebrationSoundEnabled] = useState(() => {
+    const savedPreference = window.localStorage.getItem(SOUND_STORAGE_KEY)
+    return savedPreference !== 'false'
+  })
   const [isWinnerScreenFullscreen, setIsWinnerScreenFullscreen] = useState(false)
   const [fullscreenError, setFullscreenError] = useState('')
   const [localEntries, setLocalEntries] = useState<LocalEntry[]>([])
@@ -403,6 +410,54 @@ function App() {
     window.localStorage.setItem(THEME_STORAGE_KEY, theme)
   }, [theme])
 
+  useEffect(() => {
+    window.localStorage.setItem(SOUND_STORAGE_KEY, String(isCelebrationSoundEnabled))
+  }, [isCelebrationSoundEnabled])
+
+  const playCelebrationSound = useCallback(async () => {
+    if (!isCelebrationSoundEnabled) {
+      return
+    }
+
+    const AudioContextCtor = window.AudioContext || (window as typeof window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext
+    if (!AudioContextCtor) {
+      return
+    }
+
+    const audioContext = new AudioContextCtor()
+    if (audioContext.state === 'suspended') {
+      await audioContext.resume()
+    }
+
+    const notes = [
+      { freq: 523.25, offset: 0, duration: 0.11, gain: 0.09 },
+      { freq: 659.25, offset: 0.12, duration: 0.11, gain: 0.09 },
+      { freq: 783.99, offset: 0.24, duration: 0.12, gain: 0.09 },
+      { freq: 1046.5, offset: 0.36, duration: 0.16, gain: 0.1 },
+    ]
+
+    notes.forEach((note) => {
+      const oscillator = audioContext.createOscillator()
+      const gainNode = audioContext.createGain()
+      const startTime = audioContext.currentTime + note.offset
+
+      oscillator.type = 'triangle'
+      oscillator.frequency.value = note.freq
+      gainNode.gain.setValueAtTime(0, startTime)
+      gainNode.gain.linearRampToValueAtTime(note.gain, startTime + 0.015)
+      gainNode.gain.exponentialRampToValueAtTime(0.0001, startTime + note.duration)
+
+      oscillator.connect(gainNode)
+      gainNode.connect(audioContext.destination)
+      oscillator.start(startTime)
+      oscillator.stop(startTime + note.duration)
+    })
+
+    window.setTimeout(() => {
+      void audioContext.close()
+    }, 950)
+  }, [isCelebrationSoundEnabled])
+
   const toggleTheme = () => {
     setTheme((current) => (current === 'dark' ? 'light' : 'dark'))
   }
@@ -598,11 +653,13 @@ function App() {
         setWinners((current) => [winner, ...current])
         setCurrentWinner(winner)
         setConfettiBurstCount((current) => current + 1)
+        void playCelebrationSound()
       } else {
         const winner = await drawWinner(prizeLabel)
         await playAnimation(winner.displayName)
         setCurrentWinner(winner)
         setConfettiBurstCount((current) => current + 1)
+        void playCelebrationSound()
         await loadDashboard()
       }
     } catch (error) {
@@ -776,6 +833,26 @@ function App() {
           className={`content-grid ${isAdminRoute && !adminLocked ? 'winner-selection-screen' : ''}`}
           ref={isAdminRoute && !adminLocked ? winnerScreenRef : undefined}
         >
+          {currentWinner && !isAnimating && (
+            <div key={confettiBurstCount} className="confetti-layer" aria-hidden="true">
+              {confettiPieces.map((piece) => (
+                <span
+                  key={piece.id}
+                  className="confetti-piece"
+                  style={{
+                    left: `${piece.left}%`,
+                    width: `${piece.sizePx}px`,
+                    height: `${piece.sizePx * CONFETTI_PIECE_HEIGHT_RATIO}px`,
+                    animationDelay: `${piece.delayMs}ms`,
+                    animationDuration: `${piece.duration}ms`,
+                    backgroundColor: piece.color,
+                    borderRadius: `${piece.borderRadiusPx}px`,
+                    transform: `rotate(${piece.rotationDeg}deg)`,
+                  }}
+                />
+              ))}
+            </div>
+          )}
           <article className="panel" id="entry">
             <header className="panel-header">
               <div>
@@ -870,25 +947,6 @@ function App() {
                 </label>
 
                 <div className={`roulette-card ${isAnimating ? 'live' : ''}`}>
-                  {currentWinner && !isAnimating && (
-                    <div key={confettiBurstCount} className="confetti-layer" aria-hidden="true">
-                      {confettiPieces.map((piece) => (
-                        <span
-                          key={piece.id}
-                          className="confetti-piece"
-                          style={{
-                            left: `${piece.left}%`,
-                            width: `${piece.sizePx}px`,
-                            height: `${piece.sizePx * CONFETTI_PIECE_HEIGHT_RATIO}px`,
-                            animationDelay: `${piece.delayMs}ms`,
-                            animationDuration: `${piece.duration}ms`,
-                            backgroundColor: piece.color,
-                            transform: `rotate(${piece.rotationDeg}deg)`,
-                          }}
-                        />
-                      ))}
-                    </div>
-                  )}
                   <span className="roulette-label">{isAnimating ? 'Live draw in progress' : 'Winner reveal'}</span>
                   <strong>{winnerHeadline}</strong>
                   <p>
@@ -913,6 +971,14 @@ function App() {
                   <button className="secondary-button" type="button" onClick={() => void toggleWinnerScreenFullscreen()}>
                     {isWinnerScreenFullscreen ? 'Exit full screen' : 'Full screen mode'}
                   </button>
+                  <label className="celebration-sound-toggle">
+                    <input
+                      type="checkbox"
+                      checked={isCelebrationSoundEnabled}
+                      onChange={(event) => setIsCelebrationSoundEnabled(event.target.checked)}
+                    />
+                    Celebration sound
+                  </label>
                   {isLocalFileMode && (
                     <button
                       className="secondary-button"
