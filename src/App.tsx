@@ -115,6 +115,7 @@ const CONFETTI_CIRCLE_PROBABILITY = 0.68
 const CONFETTI_CIRCLE_BORDER_RADIUS = 999
 const CONFETTI_MIN_RECT_RADIUS = 2
 const CONFETTI_RECT_RADIUS_RANGE = 6
+const CONFETTI_RECT_RADIUS_SIZE_RATIO = 0.55
 const CELEBRATION_AUDIO_CLOSE_DELAY_MS = 950
 
 const buildConfettiPieces = (seed: number): ConfettiPiece[] => {
@@ -133,7 +134,8 @@ const buildConfettiPieces = (seed: number): ConfettiPiece[] => {
       color: colors[index % colors.length]!,
       borderRadiusPx: isCirclePiece
         ? CONFETTI_CIRCLE_BORDER_RADIUS
-        : CONFETTI_MIN_RECT_RADIUS + Math.random() * Math.min(CONFETTI_RECT_RADIUS_RANGE, sizePx * 0.55),
+        : CONFETTI_MIN_RECT_RADIUS +
+          Math.random() * Math.min(CONFETTI_RECT_RADIUS_RANGE, sizePx * CONFETTI_RECT_RADIUS_SIZE_RATIO),
     }
   })
 }
