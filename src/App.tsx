@@ -48,6 +48,16 @@ type AdminEntryOption = {
   wonAt: string | null
 }
 
+type ConfettiPiece = {
+  id: number
+  left: number
+  delayMs: number
+  duration: number
+  sizePx: number
+  rotationDeg: number
+  color: string
+}
+
 const PUBLIC_ROUTE = '#/'
 const ADMIN_ROUTE = '#/admin'
 const RULES_ROUTE = '#/rules'
@@ -91,6 +101,23 @@ const buildAnimationSequence = (winnerName: string) => {
   return [...sequence, winnerName, winnerName]
 }
 
+const CONFETTI_PIECE_HEIGHT_RATIO = 0.6
+const CONFETTI_PIECE_COUNT = 72
+
+const buildConfettiPieces = (seed: number): ConfettiPiece[] => {
+  const colors = ['#7ee787', '#58a6ff', '#fbbf24', '#f472b6', '#34d399']
+
+  return Array.from({ length: CONFETTI_PIECE_COUNT }, (_, index) => ({
+    id: seed * 1000 + index,
+    left: Math.random() * 100,
+    delayMs: Math.random() * 320,
+    duration: 1200 + Math.random() * 1100,
+    sizePx: 7 + Math.random() * 8,
+    rotationDeg: Math.random() * 360,
+    color: colors[index % colors.length]!,
+  }))
+}
+
 const formatPublicWinnerName = (displayName: string) => {
   const parts = displayName
     .trim()
@@ -109,6 +136,7 @@ const formatPublicWinnerName = (displayName: string) => {
 
 function App() {
   const animationTimeout = useRef<number | undefined>(undefined)
+  const winnerScreenRef = useRef<HTMLDivElement | null>(null)
   const [theme, setTheme] = useState<'dark' | 'light'>(() => {
     const savedTheme = window.localStorage.getItem(THEME_STORAGE_KEY)
     return savedTheme === 'light' ? 'light' : 'dark'
@@ -134,6 +162,9 @@ function App() {
   const [currentWinner, setCurrentWinner] = useState<WinnerRecord | null>(null)
   const [activeName, setActiveName] = useState(rouletteFillers[0])
   const [isAnimating, setIsAnimating] = useState(false)
+  const [confettiBurstCount, setConfettiBurstCount] = useState(0)
+  const [isWinnerScreenFullscreen, setIsWinnerScreenFullscreen] = useState(false)
+  const [fullscreenError, setFullscreenError] = useState('')
   const [localEntries, setLocalEntries] = useState<LocalEntry[]>([])
   const [localFileError, setLocalFileError] = useState('')
   const [adminEntries, setAdminEntries] = useState<EntryRecord[]>([])
@@ -190,6 +221,14 @@ function App() {
     () => visibleAdminEntries.find((entry) => entry.id === selectedEntryId) ?? null,
     [selectedEntryId, visibleAdminEntries],
   )
+
+  const confettiPieces = useMemo(() => {
+    if (confettiBurstCount === 0) {
+      return []
+    }
+
+    return buildConfettiPieces(confettiBurstCount)
+  }, [confettiBurstCount])
 
   useEffect(() => {
     window.location.hash = normalizeHashRoute()
@@ -314,6 +353,28 @@ function App() {
       setSelectedEntryId(visibleAdminEntries[0]!.id)
     }
   }, [selectedEntryId, visibleAdminEntries])
+
+  useEffect(() => {
+    const handleFullscreenChange = () => {
+      setIsWinnerScreenFullscreen(document.fullscreenElement === winnerScreenRef.current)
+    }
+
+    document.addEventListener('fullscreenchange', handleFullscreenChange)
+    return () => {
+      document.removeEventListener('fullscreenchange', handleFullscreenChange)
+    }
+  }, [])
+
+  useEffect(() => {
+    const shouldExitFullscreen = !isAdminRoute || adminLocked
+    if (!shouldExitFullscreen || document.fullscreenElement !== winnerScreenRef.current) {
+      return
+    }
+
+    void document.exitFullscreen().catch(() => {
+      console.warn('Unable to exit fullscreen mode after leaving the winner selection screen.')
+    })
+  }, [adminLocked, isAdminRoute])
 
   const winnerHeadline = useMemo(() => {
     if (currentWinner) {
@@ -529,16 +590,38 @@ function App() {
         await playAnimation(winner.displayName)
         setWinners((current) => [winner, ...current])
         setCurrentWinner(winner)
+        setConfettiBurstCount((current) => current + 1)
       } else {
         const winner = await drawWinner(prizeLabel)
         await playAnimation(winner.displayName)
         setCurrentWinner(winner)
+        setConfettiBurstCount((current) => current + 1)
         await loadDashboard()
       }
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Unable to complete the draw.'
       setDrawError(message)
       setIsAnimating(false)
+    }
+  }
+
+  const toggleWinnerScreenFullscreen = async () => {
+    if (!winnerScreenRef.current) {
+      return
+    }
+
+    setFullscreenError('')
+    const wasFullscreen = document.fullscreenElement === winnerScreenRef.current
+
+    try {
+      if (wasFullscreen) {
+        await document.exitFullscreen()
+      } else {
+        await winnerScreenRef.current.requestFullscreen()
+      }
+    } catch {
+      const action = wasFullscreen ? 'exit' : 'enter'
+      setFullscreenError(`Unable to ${action} fullscreen mode in this browser.`)
     }
   }
 
@@ -682,7 +765,10 @@ function App() {
           </aside>
         </section>
       ) : (
-        <section className="content-grid">
+        <section
+          className={`content-grid ${isAdminRoute && !adminLocked ? 'winner-selection-screen' : ''}`}
+          ref={isAdminRoute && !adminLocked ? winnerScreenRef : undefined}
+        >
           <article className="panel" id="entry">
             <header className="panel-header">
               <div>
@@ -777,6 +863,25 @@ function App() {
                 </label>
 
                 <div className={`roulette-card ${isAnimating ? 'live' : ''}`}>
+                  {currentWinner && !isAnimating && (
+                    <div key={confettiBurstCount} className="confetti-layer" aria-hidden="true">
+                      {confettiPieces.map((piece) => (
+                        <span
+                          key={piece.id}
+                          className="confetti-piece"
+                          style={{
+                            left: `${piece.left}%`,
+                            width: `${piece.sizePx}px`,
+                            height: `${piece.sizePx * CONFETTI_PIECE_HEIGHT_RATIO}px`,
+                            animationDelay: `${piece.delayMs}ms`,
+                            animationDuration: `${piece.duration}ms`,
+                            backgroundColor: piece.color,
+                            transform: `rotate(${piece.rotationDeg}deg)`,
+                          }}
+                        />
+                      ))}
+                    </div>
+                  )}
                   <span className="roulette-label">{isAnimating ? 'Live draw in progress' : 'Winner reveal'}</span>
                   <strong>{winnerHeadline}</strong>
                   <p>
@@ -798,6 +903,9 @@ function App() {
                   <button className="secondary-button" type="button" onClick={() => void loadDashboard()}>
                     {adminLoading ? 'Refreshing...' : 'Refresh dashboard'}
                   </button>
+                  <button className="secondary-button" type="button" onClick={() => void toggleWinnerScreenFullscreen()}>
+                    {isWinnerScreenFullscreen ? 'Exit full screen' : 'Full screen mode'}
+                  </button>
                   {isLocalFileMode && (
                     <button
                       className="secondary-button"
@@ -810,6 +918,7 @@ function App() {
                   )}
                 </div>
 
+                {fullscreenError && <p className="form-message error">{fullscreenError}</p>}
                 <div className="entry-manager">
                   <label className="prize-field" htmlFor="entry-selector">
                     Manage entries
