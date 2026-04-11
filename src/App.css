@@ -305,7 +305,6 @@
 .confetti-piece {
   position: absolute;
   top: -10%;
-  border-radius: 2px;
   opacity: 0;
   animation-name: confetti-fall;
   animation-timing-function: cubic-bezier(0.12, 0.78, 0.24, 1);

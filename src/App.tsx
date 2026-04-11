@@ -59,6 +59,10 @@ type ConfettiPiece = {
   borderRadiusPx: number
 }
 
+type WindowWithWebkitAudio = typeof window & {
+  webkitAudioContext?: typeof AudioContext
+}
+
 const PUBLIC_ROUTE = '#/'
 const ADMIN_ROUTE = '#/admin'
 const RULES_ROUTE = '#/rules'
@@ -108,7 +112,7 @@ const CONFETTI_PIECE_COUNT = 220
 const CONFETTI_HORIZONTAL_START_PERCENT = -12
 const CONFETTI_HORIZONTAL_RANGE_PERCENT = 124
 const CONFETTI_CIRCLE_PROBABILITY = 0.68
-const CONFETTI_CIRCLE_RADIUS = 999
+const CONFETTI_CIRCLE_BORDER_RADIUS = 999
 const CONFETTI_MIN_RECT_RADIUS = 2
 const CONFETTI_RECT_RADIUS_RANGE = 6
 const CELEBRATION_AUDIO_CLOSE_DELAY_MS = 950
@@ -126,7 +130,7 @@ const buildConfettiPieces = (seed: number): ConfettiPiece[] => {
     color: colors[index % colors.length]!,
     borderRadiusPx:
       Math.random() > CONFETTI_CIRCLE_PROBABILITY
-        ? CONFETTI_CIRCLE_RADIUS
+        ? CONFETTI_CIRCLE_BORDER_RADIUS
         : CONFETTI_MIN_RECT_RADIUS + Math.random() * CONFETTI_RECT_RADIUS_RANGE,
   }))
 }
@@ -429,7 +433,7 @@ function App() {
       return
     }
 
-    const AudioContextCtor = window.AudioContext || (window as typeof window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext
+    const AudioContextCtor = window.AudioContext || (window as WindowWithWebkitAudio).webkitAudioContext
     if (!AudioContextCtor) {
       return
     }
