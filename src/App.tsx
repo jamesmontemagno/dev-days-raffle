@@ -59,7 +59,7 @@ type ConfettiPiece = {
   borderRadiusPx: number
 }
 
-type WindowWithWebkitAudio = typeof window & {
+type WindowWithWebkitAudioContext = typeof window & {
   webkitAudioContext?: typeof AudioContext
 }
 
@@ -109,7 +109,7 @@ const buildAnimationSequence = (winnerName: string) => {
 
 const CONFETTI_PIECE_HEIGHT_RATIO = 0.6
 const CONFETTI_PIECE_COUNT = 220
-const CONFETTI_HORIZONTAL_START_PERCENT = -12
+const CONFETTI_HORIZONTAL_OFFSET_PERCENT = -12
 const CONFETTI_HORIZONTAL_RANGE_PERCENT = 124
 const CONFETTI_CIRCLE_PROBABILITY = 0.68
 const CONFETTI_CIRCLE_BORDER_RADIUS = 999
@@ -122,14 +122,14 @@ const buildConfettiPieces = (seed: number): ConfettiPiece[] => {
 
   return Array.from({ length: CONFETTI_PIECE_COUNT }, (_, index) => ({
     id: seed * 1000 + index,
-    left: CONFETTI_HORIZONTAL_START_PERCENT + Math.random() * CONFETTI_HORIZONTAL_RANGE_PERCENT,
+    left: CONFETTI_HORIZONTAL_OFFSET_PERCENT + Math.random() * CONFETTI_HORIZONTAL_RANGE_PERCENT,
     delayMs: Math.random() * 460,
     duration: 1500 + Math.random() * 1400,
     sizePx: 6 + Math.random() * 10,
     rotationDeg: Math.random() * 360,
     color: colors[index % colors.length]!,
     borderRadiusPx:
-      Math.random() > CONFETTI_CIRCLE_PROBABILITY
+      Math.random() < CONFETTI_CIRCLE_PROBABILITY
         ? CONFETTI_CIRCLE_BORDER_RADIUS
         : CONFETTI_MIN_RECT_RADIUS + Math.random() * CONFETTI_RECT_RADIUS_RANGE,
   }))
@@ -433,7 +433,7 @@ function App() {
       return
     }
 
-    const AudioContextCtor = window.AudioContext || (window as WindowWithWebkitAudio).webkitAudioContext
+    const AudioContextCtor = window.AudioContext || (window as WindowWithWebkitAudioContext).webkitAudioContext
     if (!AudioContextCtor) {
       return
     }
