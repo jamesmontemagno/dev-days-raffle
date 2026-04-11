@@ -367,7 +367,14 @@ function App() {
 
   useEffect(() => {
     const shouldExitFullscreen = !isAdminRoute || adminLocked
-    if (!shouldExitFullscreen || document.fullscreenElement !== winnerScreenRef.current) {
+    const supportsFullscreenExit = typeof document.exitFullscreen === 'function'
+
+    if (
+      !supportsFullscreenExit ||
+      !shouldExitFullscreen ||
+      !winnerScreenRef.current ||
+      document.fullscreenElement !== winnerScreenRef.current
+    ) {
       return
     }
 
